@@ -190,8 +190,11 @@ void webusb_connection_event(uint16_t interfaceNumber, uint16_t value)
         // 2: Connect and send null command
         // 3: Connect only
 
-        // Connected or disconnected. In either case, clear write buffer.
-        tud_vendor_n_write_clear(index);
+        // Connected or disconnected. In either case, drain the write buffer.
+        // tinyusb 0.18 removed tud_vendor_n_write_clear and exposes no way to discard the
+        // vendor tx fifo, so flush it out instead. On a connect transition the buffer is
+        // normally empty anyway.
+        tud_vendor_n_write_flush(index);
 
         if (value != 0)
         {

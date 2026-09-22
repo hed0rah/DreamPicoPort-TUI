@@ -24,6 +24,7 @@
 #pragma once
 
 #include "hal/Usb/WebUsbCommandHandler.hpp"
+#include <cstdint>
 #include "hal/System/SystemIdentification.hpp"
 #include "hal/System/MutexInterface.hpp"
 #include "hal/System/DppSettings.hpp"

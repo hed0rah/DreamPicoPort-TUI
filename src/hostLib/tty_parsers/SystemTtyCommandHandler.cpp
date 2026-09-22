@@ -22,6 +22,7 @@
 // SOFTWARE.
 
 #include "SystemTtyCommandHandler.hpp"
+#include <cstdint>
 #include "hal/MapleBus/MaplePacket.hpp"
 
 #include <stdio.h>

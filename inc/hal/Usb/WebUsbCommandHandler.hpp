@@ -26,10 +26,13 @@
 #include "hal/System/MutexInterface.hpp"
 
 #include <cstdint>
+#include <cstddef>
 #include <vector>
 #include <memory>
 #include <functional>
 #include <list>
+#include <algorithm>
+#include <type_traits>
 
 //! Command parser for processing commands from a WebUSB serial stream
 class WebUsbCommandHandler

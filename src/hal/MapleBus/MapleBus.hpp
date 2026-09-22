@@ -24,6 +24,7 @@
 #pragma once
 
 #include <memory>
+#include <cstdint>
 #include <limits>
 #include "hal/MapleBus/MapleBusInterface.hpp"
 #include "pico/stdlib.h"

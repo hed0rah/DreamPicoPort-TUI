@@ -1,3 +1,94 @@
+# DreamPicoPort-TUI
+
+A fork of [OrangeFox86/DreamPicoPort](https://github.com/OrangeFox86/DreamPicoPort) that
+adds a USB keyboard client, a serial configuration console, and an optional OLED status
+display. Upstream's own README follows below unchanged.
+
+## What this fork adds
+
+**USB keyboard to Dreamcast keyboard.** Upstream shipped a complete `DreamcastKeyboard`
+Maple implementation that nothing ever instantiated, and a USB host layer that only handled
+gamepads. This adds the glue. No usage code translation is needed: the Dreamcast reports the
+same HID usage codes a USB keyboard does, and the modifier byte matches on bits 0 through 6.
+
+**Settings over the serial console.** Upstream exposes configuration only over WebUSB, which
+means a browser is the only way to configure a device. The same fields are now reachable
+from the tty parser under `=`, as line oriented text that a person can type and a script can
+parse. The WebUSB path is untouched.
+
+**An optional SSD1306 status display.** Three pages, cycled by a button: typing stats
+(words and characters per minute), a debug page (usb vid:pid, raw HID report, Maple poll
+rate, player slot), and a title card. Useful for bringing up a new device without attaching
+a laptop and two serial terminals.
+
+**Build fixes.** Upstream does not currently build against pico-sdk 2.3.0 with a modern ARM
+toolchain. Three commits fix that, and a fourth fixes a signed overflow in upstream's
+keyboard code that had never been compiled because nothing instantiated the class. Those
+four are self contained and would apply upstream unchanged.
+
+**The WebUSB landing page** now points here rather than upstream, and the browser
+announcement defaults off, since this fork configures over serial.
+
+## Targets
+
+    client-with-usb-keyboard       the adapter
+    client-with-usb-keyboard-dbg   same, plus UART tracing on GP0 at 115200
+    client-with-usb-keyboard-oled  same, plus the display
+    bench-host                     turns a spare RP2040 into a fake Dreamcast for desk testing
+
+## Building
+
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPICO_SDK_PATH=/path/to/pico-sdk
+cmake --build build --target client-with-usb-keyboard
+```
+
+`-DPICO_SDK_PATH` is not optional: upstream's `CMakeLists.txt` accepts the environment
+variable on one line and dereferences the unset CMake variable on the next.
+
+Useful overrides:
+
+    -DKBD_BUS_START_PIN=14      SDCKA pin, SDCKB is the next one up. Default 6
+    -DKBD_LED_ACTIVE_LOW=false  a Pico's GP25 is active high, a XIAO's is not
+    -DKBD_LANGUAGE=1 -DKBD_TYPE=7   Japan / 106 key instead of America / 104
+    -DKBD_LED_WRITEBACK=0       do not push lock LED state back to the keyboard
+
+## Wiring
+
+Defaults target a Seeed XIAO RP2040 wired straight to a controller cable with no bus
+transceiver. Identify every conductor with a meter rather than by pin number or wire
+colour, since neither is standardised across cables.
+
+    Dreamcast        XIAO
+    data             D4   (GP6)   SDCKA
+    data             D5   (GP7)   SDCKB
+    +5V              5V
+    GND              GND
+    sense            GND
+
+    debug UART  ->   D6   (GP0), 115200 8N1, receive only
+    OLED SDA    ->   D0   (GP26), SCL -> D1 (GP27), VCC -> 3V3
+    page button ->   D2   (GP28) to GND, internal pull up
+
+Which data line is SDCKA and which is SDCKB cannot be determined with a meter. If the
+console sees nothing, swap those two before suspecting anything else.
+
+## Status
+
+The keyboard client is verified on real hardware: a console assigns a player slot, polls the
+adapter, and keystrokes cross from USB to Maple. Modifiers and five key rollover work. The
+display and the serial settings console are also verified.
+
+Known gaps:
+
+- Declared current draw of 20/50 mA is a guess and is almost certainly low. This adapter is
+  an RP2040 plus a bus powered keyboard, realistically over 100 mA. Measure before relying
+  on it, since the console fuses one 5V rail across all four ports.
+- The device info version string is invented, not a dump of a real HKT-7620.
+- Gamepad support is still DS4 only, inherited from upstream.
+
+---
+
 # DreamPicoPort (formally DreamcastControllerUsbPico)
 
 Using a Raspberry Pi Pico, DreamPicoPort enables USB interfacing with a Dreamcast or its controllers and peripherals, functioning in either host mode or client mode as depicted below.

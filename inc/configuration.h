@@ -116,4 +116,10 @@
     #define SIMPLE_USB_LED_PIN -1
 #endif
 
+// Set true when the LED is wired to 3V3 and lit by pulling the pin low, as on the
+// Seeed XIAO RP2040 where GP25 is the blue user LED
+#ifndef LED_ACTIVE_LOW
+    #define LED_ACTIVE_LOW false
+#endif
+
 #endif // __CONFIGURATION_H__

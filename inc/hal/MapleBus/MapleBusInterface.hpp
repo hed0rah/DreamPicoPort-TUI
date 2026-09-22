@@ -25,6 +25,7 @@
 #define __MAPLE_BUS_INTERFACE_H__
 
 #include <stdint.h>
+#include <cstdint>
 #include <memory>
 #include "configuration.h"
 #include "utils.h"

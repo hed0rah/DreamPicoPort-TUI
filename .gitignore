@@ -4,3 +4,5 @@ build/*
 build-*/*
 build-test/*
 dist/*
+# internal notes, never published
+internal_docs/

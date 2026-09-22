@@ -25,12 +25,13 @@
 
 #include "DreamcastPeripheralFunction.hpp"
 #include "dreamcast_constants.h"
+#include "KeyboardHost.hpp"
 
 #include <string.h>
 
 namespace client
 {
-class DreamcastKeyboard : public DreamcastPeripheralFunction
+class DreamcastKeyboard : public DreamcastPeripheralFunction, public KeyboardHost
 {
 public:
     enum class Language : uint8_t
@@ -110,7 +111,9 @@ public:
         mKeyboardControlsLed(keyboardControlsLed),
         mPressedChangeKeys(0),
         mLedState(),
-        mPressedKeys()
+        mPressedKeys(),
+        mGetConditionCount(0),
+        mSetConditionCount(0)
     {}
 
     inline virtual bool handlePacket(const MaplePacket& in, MaplePacket& out) final
@@ -120,22 +123,26 @@ public:
         {
             case COMMAND_GET_CONDITION:
             {
+                mGetConditionCount = mGetConditionCount + 1;
                 out.frame.command = COMMAND_RESPONSE_DATA_XFER;
                 out.reservePayload(3);
                 out.appendPayload(getFunctionCode());
+                // every shift operand is widened first: uint8_t promotes to int, and
+                // (0x80 << 24) on an int is signed overflow, reachable here with the S2
+                // change key or any usage code >= 0x80 in slot 2 or 5
                 uint32_t payload[2] = {
-                    (mPressedChangeKeys << 24)
-                        | ((mLedState.shiftLedOn ? 0x80 : 0) << 16)
-                        | ((mLedState.powerLedOn ? 0x40 : 0) << 16)
-                        | ((mLedState.kanaLedOn ? 0x20 : 0) << 16)
-                        | ((mLedState.scrollLockLedOn ? 0x04 : 0) << 16)
-                        | ((mLedState.capsLockLedOn ? 0x02 : 0) << 16)
-                        | ((mLedState.numLockLedOn ? 0x01 : 0) << 16)
-                        | (mPressedKeys[0] << 8)
+                    (static_cast<uint32_t>(mPressedChangeKeys) << 24)
+                        | ((mLedState.shiftLedOn ? 0x80u : 0u) << 16)
+                        | ((mLedState.powerLedOn ? 0x40u : 0u) << 16)
+                        | ((mLedState.kanaLedOn ? 0x20u : 0u) << 16)
+                        | ((mLedState.scrollLockLedOn ? 0x04u : 0u) << 16)
+                        | ((mLedState.capsLockLedOn ? 0x02u : 0u) << 16)
+                        | ((mLedState.numLockLedOn ? 0x01u : 0u) << 16)
+                        | (static_cast<uint32_t>(mPressedKeys[0]) << 8)
                         | mPressedKeys[1],
-                    (mPressedKeys[2] << 24)
-                        | (mPressedKeys[3] << 16)
-                        | (mPressedKeys[4] << 8)
+                    (static_cast<uint32_t>(mPressedKeys[2]) << 24)
+                        | (static_cast<uint32_t>(mPressedKeys[3]) << 16)
+                        | (static_cast<uint32_t>(mPressedKeys[4]) << 8)
                         | mPressedKeys[5]
                 };
                 out.appendPayload(payload, 2);
@@ -147,6 +154,7 @@ public:
             {
                 if (in.payload.size() > 1)
                 {
+                    mSetConditionCount = mSetConditionCount + 1;
                     uint8_t ledSetting = in.payload[1] >> 24;
                     mLedState.shiftLedOn = ((ledSetting & 0x80) != 0);
                     mLedState.powerLedOn = ((ledSetting & 0x40) != 0);
@@ -207,10 +215,25 @@ public:
         memcpy(mPressedKeys, keys, sizeof(mPressedKeys));
     }
 
+    //! Set keys from a HID boot protocol report. The Dreamcast reports the same usage
+    //! codes a USB keyboard does, so both the modifier byte and the key array pass
+    //! straight through. HID right gui lands on the Dreamcast S2 bit.
+    inline virtual void setKeys(const Keys& keys) final
+    {
+        mPressedChangeKeys = keys.modifiers;
+        memcpy(mPressedKeys, keys.keys, sizeof(mPressedKeys));
+    }
+
     inline const LedState& getLedState()
     {
         return mLedState;
     }
+
+    //! Number of GET_CONDITION commands served. Nonzero means the console is polling us.
+    inline uint32_t getGetConditionCount() const { return mGetConditionCount; }
+
+    //! Number of SET_CONDITION commands served, i.e. lock LED updates from the console
+    inline uint32_t getSetConditionCount() const { return mSetConditionCount; }
 
 private:
     const Language mLanguage;
@@ -227,5 +250,8 @@ private:
     LedState mLedState;
     //! Currently pressed set of keys - follows the same format as a HID keyboard
     uint8_t mPressedKeys[6];
+    //! Written from the maple core, read from the usb core for diagnostics only
+    volatile uint32_t mGetConditionCount;
+    volatile uint32_t mSetConditionCount;
 };
 }

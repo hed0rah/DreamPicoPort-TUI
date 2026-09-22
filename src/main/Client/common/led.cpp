@@ -74,5 +74,8 @@ void led_task(uint64_t lastActivityTimeUs)
         ledOn = true;
     }
 
-    gpio_put(CLIENT_LED_PIN, ledOn);
+    if (CLIENT_LED_PIN >= 0)
+    {
+        gpio_put(CLIENT_LED_PIN, LED_ACTIVE_LOW ? !ledOn : ledOn);
+    }
 }

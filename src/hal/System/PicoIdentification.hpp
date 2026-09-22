@@ -24,6 +24,7 @@
 #pragma once
 
 #include <hal/System/SystemIdentification.hpp>
+#include <cstdint>
 #include "pico/unique_id.h"
 
 class PicoIdentification : public SystemIdentification

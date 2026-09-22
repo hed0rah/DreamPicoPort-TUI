@@ -69,8 +69,11 @@ struct DppSettings
     bool cdcEn = true;
     //! USB MSC enabled flag (default: false)
     bool mscEn = false;
-    //! USB WebUSB announcement enabled flag (default: true)
-    bool webUsbAnnounceEn = true;
+    //! USB WebUSB announcement enabled flag (default: false)
+    //! When true the device advertises a landing page url and the browser offers to open
+    //! it. This fork configures over the serial console instead, so it defaults off. The
+    //! WebUSB transport itself stays available; Flycast uses it for controller passthrough.
+    bool webUsbAnnounceEn = false;
     //! Detection mode for each player
     PlayerDetectionMode playerDetectionModes[kNumPlayers] = {
         PlayerDetectionMode::kAutoStatic,

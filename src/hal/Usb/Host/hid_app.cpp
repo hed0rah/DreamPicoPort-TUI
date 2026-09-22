@@ -31,11 +31,27 @@
 #include "tusb_config.h"
 
 #include "GamepadHost.hpp"
+#include "KeyboardHost.hpp"
 #include <string.h>
 
 #include "VibrationObserver.hpp"
 
 static GamepadHost* pGamepadHost = nullptr;
+static KeyboardHost* pKeyboardHost = nullptr;
+
+// Runtime rather than compile time so that hal-Usb-Host stays a single library shared by
+// every executable. Targets without stdio never set it and never pay for the prints.
+static bool keyboardDebug = false;
+static bool keyboardMounted = false;
+// Last report and identity, kept for the status display
+static KeyboardHost::Keys keyboardLastKeys = {};
+static uint16_t keyboardVid = 0;
+static uint16_t keyboardPid = 0;
+// Key down edges since boot, for the words per minute display
+static uint32_t keyboardStrokes = 0;
+// Which device to address when pushing lock LEDs back
+static uint8_t keyboardDevAddr = 0;
+static uint8_t keyboardInstance = 0;
 
 typedef struct TU_ATTR_PACKED {
   // First 16 bits set what data is pertinent in this structure (1 = set; 0 = not set)
@@ -241,6 +257,54 @@ void set_gamepad_host(GamepadHost* ctrlr)
   pGamepadHost = ctrlr;
 }
 
+void set_keyboard_host(KeyboardHost* keyboard)
+{
+  pKeyboardHost = keyboard;
+}
+
+void set_keyboard_debug(bool enable)
+{
+  keyboardDebug = enable;
+}
+
+bool is_keyboard_mounted()
+{
+  return keyboardMounted;
+}
+
+KeyboardHost::Keys get_last_keys()
+{
+  return keyboardLastKeys;
+}
+
+uint32_t get_keystroke_count()
+{
+  return keyboardStrokes;
+}
+
+void get_keyboard_vid_pid(uint16_t& vid, uint16_t& pid)
+{
+  vid = keyboardVid;
+  pid = keyboardPid;
+}
+
+bool set_keyboard_leds(uint8_t leds)
+{
+  if (!keyboardMounted)
+  {
+    return false;
+  }
+  // Report id 0: boot protocol keyboards have a single unnumbered output report
+  return tuh_hid_set_report(keyboardDevAddr, keyboardInstance, 0, HID_REPORT_TYPE_OUTPUT,
+                            &leds, sizeof(leds));
+}
+
+// check if the mounted interface is a boot protocol keyboard
+static inline bool is_keyboard(uint8_t dev_addr, uint8_t instance)
+{
+  return (tuh_hid_interface_protocol(dev_addr, instance) == HID_ITF_PROTOCOL_KEYBOARD);
+}
+
 // check if device is Sony DualShock 4
 static inline bool is_sony_ds4(uint8_t dev_addr)
 {
@@ -290,6 +354,29 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc_re
       printf("Error: cannot request to receive report\r\n");
     }
   }
+  // Any HID keyboard. tinyusb already puts boot capable interfaces into boot protocol
+  // during enumeration, so reports arrive as hid_keyboard_report_t.
+  else if ( is_keyboard(dev_addr, instance) )
+  {
+    keyboardMounted = true;
+    keyboardDevAddr = dev_addr;
+    keyboardInstance = instance;
+    keyboardVid = vid;
+    keyboardPid = pid;
+    if (keyboardDebug)
+    {
+      printf("[kbd] mounted vid=%04x pid=%04x addr=%u inst=%u\r\n", vid, pid, dev_addr, instance);
+    }
+    if ( !tuh_hid_receive_report(dev_addr, instance) )
+    {
+      printf("Error: cannot request to receive report\r\n");
+    }
+  }
+  else if (keyboardDebug)
+  {
+    printf("[hid] ignored vid=%04x pid=%04x itf_protocol=%u\r\n",
+           vid, pid, tuh_hid_interface_protocol(dev_addr, instance));
+  }
 }
 
 // Invoked when device with hid interface is un-mounted
@@ -299,6 +386,80 @@ void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance)
   {
     ds4_vibration_client.unmount();
   }
+
+  // release everything, otherwise keys held at unplug stay held forever
+  if (is_keyboard(dev_addr, instance))
+  {
+    keyboardMounted = false;
+    keyboardVid = 0;
+    keyboardPid = 0;
+    keyboardLastKeys = KeyboardHost::Keys{};
+    if (keyboardDebug)
+    {
+      printf("[kbd] unmounted addr=%u inst=%u\r\n", dev_addr, instance);
+    }
+    if (pKeyboardHost != nullptr)
+    {
+      KeyboardHost::Keys keys = {};
+      pKeyboardHost->setKeys(keys);
+    }
+  }
+}
+
+void process_keyboard(uint8_t const* report, uint16_t len)
+{
+  if (pKeyboardHost == nullptr || len < sizeof(hid_keyboard_report_t))
+  {
+    return;
+  }
+
+  hid_keyboard_report_t kbd_report;
+  memcpy(&kbd_report, report, sizeof(kbd_report));
+
+  KeyboardHost::Keys keys;
+  keys.modifiers = kbd_report.modifier;
+  memcpy(keys.keys, kbd_report.keycode, sizeof(keys.keys));
+
+  // Count keys that were not held in the previous report. 0x01 is ErrorRollOver, which
+  // the keyboard sends when more keys are down than it can report, not a real key.
+  for (uint8_t i = 0; i < KeyboardHost::NUM_KEYS; ++i)
+  {
+    const uint8_t k = keys.keys[i];
+    if (k == 0 || k == 0x01)
+    {
+      continue;
+    }
+    bool held = false;
+    for (uint8_t j = 0; j < KeyboardHost::NUM_KEYS; ++j)
+    {
+      if (keyboardLastKeys.keys[j] == k)
+      {
+        held = true;
+        break;
+      }
+    }
+    if (!held)
+    {
+      ++keyboardStrokes;
+    }
+  }
+
+  keyboardLastKeys = keys;
+
+  if (keyboardDebug)
+  {
+    // only on change, otherwise idle repeats flood the uart and stall the usb task
+    static KeyboardHost::Keys prev = {};
+    if (memcmp(&prev, &keys, sizeof(keys)) != 0)
+    {
+      printf("[kbd] mod=%02x keys=%02x %02x %02x %02x %02x %02x\r\n",
+             keys.modifiers, keys.keys[0], keys.keys[1], keys.keys[2],
+             keys.keys[3], keys.keys[4], keys.keys[5]);
+      prev = keys;
+    }
+  }
+
+  pKeyboardHost->setKeys(keys);
 }
 
 void process_sony_ds4(uint8_t const* report, uint16_t len)
@@ -384,6 +545,10 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t cons
   if ( is_sony_ds4(dev_addr) )
   {
     process_sony_ds4(report, len);
+  }
+  else if ( is_keyboard(dev_addr, instance) )
+  {
+    process_keyboard(report, len);
   }
 
   // continue to request to receive report

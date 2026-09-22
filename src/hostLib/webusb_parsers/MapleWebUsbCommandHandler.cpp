@@ -22,6 +22,7 @@
 // SOFTWARE.
 
 #include "MapleWebUsbCommandHandler.hpp"
+#include <cstdint>
 
 #include "hal/MapleBus/MaplePacket.hpp"
 #include "hal/System/LockGuard.hpp"

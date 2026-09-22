@@ -22,6 +22,7 @@
 // SOFTWARE.
 
 #include "SettingsWebUsbCommandHandler.hpp"
+#include <cstdint>
 
 #include <cstring>
 

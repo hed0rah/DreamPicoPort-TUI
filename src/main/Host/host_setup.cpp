@@ -35,6 +35,7 @@
 #include "MaplePassthroughTtyCommandHandler.hpp"
 #include "FlycastTtyCommandHandler.hpp"
 #include "SystemTtyCommandHandler.hpp"
+#include "SettingsTtyCommandHandler.hpp"
 
 #include "MapleWebUsbCommandHandler.hpp"
 #include "FlycastWebUsbCommandHandler.hpp"
@@ -54,7 +55,8 @@
 const uint32_t WATCHDOG_MAPLE_AUTO_DETECT_MAGIC = 0xEA68D4;
 const uint8_t MAPLE_HOST_ADDRESSES[MAX_DEVICES] = {0x00, 0x40, 0x80, 0xC0};
 const uint32_t MAPLE_PINS[MAX_DEVICES] = {P1_BUS_START_PIN, P2_BUS_START_PIN, P3_BUS_START_PIN, P4_BUS_START_PIN};
-const uint32_t MAPLE_DIR_PINS[MAX_DEVICES] = {P1_DIR_PIN, P2_DIR_PIN, P3_DIR_PIN, P4_DIR_PIN};
+// int32_t to match DppSettings::gpioDir, where -1 means no direction pin
+const int32_t MAPLE_DIR_PINS[MAX_DEVICES] = {P1_DIR_PIN, P2_DIR_PIN, P3_DIR_PIN, P4_DIR_PIN};
 
 static Clock gClock;
 
@@ -160,6 +162,7 @@ std::unique_ptr<SerialStreamParser> make_parsers(
         gClock,
         dcNodes
     ));
+    ttyParser->addTtyCommandHandler(std::make_shared<SettingsTtyCommandHandler>());
 
     // Initialize and register WebUsb parsers
     std::shared_ptr<MapleWebUsbCommandHandler> mapleWebUsbCommandHandler =

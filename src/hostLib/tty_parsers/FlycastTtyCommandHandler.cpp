@@ -1,4 +1,5 @@
 #include "FlycastTtyCommandHandler.hpp"
+#include <cstdint>
 #include "hal/MapleBus/MaplePacket.hpp"
 #include "hal/System/LockGuard.hpp"
 #include "hal/Usb/usb_interface.hpp"

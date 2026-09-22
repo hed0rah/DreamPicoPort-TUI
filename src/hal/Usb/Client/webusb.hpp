@@ -28,7 +28,7 @@
 #include "hal/Usb/WebUsbCommandHandler.hpp"
 
 // This is limited to 61 characters in length due to EP0 size of 64 and 3-byte WebUSB header
-constexpr const char* webusb_url = "orangefox86.github.io/DreamPicoPort/webusb";
+constexpr const char* webusb_url = "github.com/hed0rah/DreamPicoPort-TUI";
 static_assert(strlen(webusb_url) <= 61, "webusb_url is too large");
 
 void webusb_connection_event(uint16_t interfaceNumber, uint16_t value);

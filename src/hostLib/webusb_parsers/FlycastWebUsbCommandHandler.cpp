@@ -22,6 +22,7 @@
 // SOFTWARE.
 
 #include "FlycastWebUsbCommandHandler.hpp"
+#include <cstdint>
 
 #include "hal/MapleBus/MaplePacket.hpp"
 #include "hal/System/LockGuard.hpp"
@@ -142,7 +143,7 @@ void FlycastWebUsbCommandHandler::process(
             char buffer[mIdentification.getSerialSize() + 1] = {0};
             mIdentification.getSerial(buffer, sizeof(buffer) - 1);
             buffer[sizeof(buffer) - 1] = '\0';
-            responseFn(kResponseSuccess, {{buffer, strlen(buffer) + 1}});
+            responseFn(kResponseSuccess, {{buffer, static_cast<uint16_t>(strlen(buffer) + 1)}});
         }
         return;
 
