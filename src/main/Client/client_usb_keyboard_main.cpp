@@ -440,8 +440,13 @@ void core0()
         0x00,
         "Keyboard",
         "Version 1.000,DreamPicoPort USB HID keyboard bridge",
-        20.0,
-        50.0);
+        // Measured on a bench supply at 5V. The rp2040 with a lit oled is 20 mA. The rest
+        // is whatever keyboard is attached, and that dominates: a plain membrane one adds
+        // 10 mA and peaks at 40 while typing, an rgb one sits at 140 and bounces as the
+        // lighting animates. Declared for the rgb case, since under declaring is the
+        // impolite direction when the console fuses one 5V rail across all four ports.
+        150.0,
+        200.0);
 
     // Layout is what the console asks the keyboard to declare. A japanese release may
     // expect Japan / Key106; override with -DKBD_LANGUAGE and -DKBD_TYPE at configure time.
