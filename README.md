@@ -67,8 +67,34 @@ colour, since neither is standardised across cables.
     sense            GND
 
     debug UART  ->   D6   (GP0), 115200 8N1, receive only
-    OLED SDA    ->   D0   (GP26), SCL -> D1 (GP27), VCC -> 3V3
-    page button ->   D2   (GP28) to GND, internal pull up
+
+### Display and button (the `-oled` target)
+
+Any 0.96" 128x64 SSD1306 I2C module. These carry their own I2C pull ups.
+
+    OLED             XIAO
+    SDA              D0   (GP26, I2C1)
+    SCL              D1   (GP27, I2C1)
+    VCC              3V3
+    GND              GND
+
+    button           XIAO
+    one side         D2   (GP28)
+    other side       GND
+
+Check the module's front silkscreen for pin order before powering it. Some are
+`GND VCC SCL SDA`, others `VCC GND SCL SDA`, and reversed power kills the panel. The driver
+talks to 7-bit address `0x3C` at 400 kHz; modules jumpered to `0x3D` (printed `0x7A` on the
+back) need the address changed where `Ssd1306` is constructed.
+
+The button is any momentary switch to ground; the pin has its internal pull up enabled. For
+an arcade button, wire the microswitch's `COM` tab to GND and `NO` to D2, and leave `NC`
+unconnected.
+
+Behaviour: the title card shows for 3 seconds at boot, then the typing page. The panel blanks
+after 15 seconds without a keystroke or a press. A press wakes it, and a press while awake
+cycles typing, debug, title. Without a panel attached the firmware logs that none was found
+and runs the adapter normally.
 
 Which data line is SDCKA and which is SDCKB cannot be determined with a meter. If the
 console sees nothing, swap those two before suspecting anything else.
@@ -81,9 +107,10 @@ display and the serial settings console are also verified.
 
 Known gaps:
 
-- Declared current draw of 20/50 mA is a guess and is almost certainly low. This adapter is
-  an RP2040 plus a bus powered keyboard, realistically over 100 mA. Measure before relying
-  on it, since the console fuses one 5V rail across all four ports.
+- Declared current draw is 150 mA standby and 200 mA max, measured on a bench supply at 5V:
+  the XIAO with a lit display draws 20 mA in total, 30 with a membrane keyboard idle and 40
+  while typing, about 140 with an RGB keyboard. A keyboard heavier than that is on you, since
+  the console fuses one 5V rail across all four ports.
 - The device info version string is invented, not a dump of a real HKT-7620.
 - Gamepad support is still DS4 only, inherited from upstream.
 
